@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Blood Bank Management Pro</title>
+
+  <style>
+    :root{
+      --primary:#ef4444;
+      --bg:#0a0f1c;
+      --surface:#161e2d;
+      --border:#2d3748;
+      --text:#f8fafc;
+      --muted:#94a3b8;
+      --success:#10b981;
+      --warning:#f59e0b; /* For low stock */
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+
+    .layout{display:flex;height:100vh}
+
+    .nav{
+      width:240px;
+      background:var(--surface);
+      border-right:1px solid var(--border);
+      padding:24px;
+    }
+
+    .brand{
+      font-weight:800;
+      font-size:1.3rem;
+      color:var(--primary);
+      margin-bottom:30px;
+    }
+
+    .nav button{
+      width:100%;
+      padding:12px;
+      margin-bottom:8px;
+      border-radius:10px;
+      border:none;
+      background:none;
+      color:var(--muted);
+      cursor:pointer;
+      text-align:left;
+      transition: 0.2s;
+    }
+
+    .nav button.active,
+    .nav button:hover{
+      background:var(--primary);
+      color:white;
+    }
+
+    .main{
+      flex:1;
+      padding:32px;
+      overflow:auto;
+    }
+
+    .card{
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:20px;
+      margin-bottom:24px;
+    }
+
+    .form{
+      display:grid;
+      grid-template-columns:2fr 1fr 1fr auto;
+      gap:12px;
+    }
+
+    input,select{
+      padding:10px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:var(--bg);
+      color:white;
+      outline: none;
+    }
+
+    input:focus{ border-color: var(--primary); }
+
+    button.submit{
+      background:var(--primary);
+      color:white;
+      border:none;
+      border-radius:8px;
+      padding:10px 18px;
+      cursor:pointer;
+      font-weight:600;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:0.9rem;
+    }
+
+    th,td{
+      padding:12px;
+      border-bottom:1px solid var(--border);
+      text-align:left;
+    }
+
+    th{color:var(--muted)}
+
+    .inventory{
+      display:grid;
+      grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));
+      gap:12px;
+    }
+
+    .inv-box{
+      background:var(--bg);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:16px;
+      display:flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .low-stock {
+      border: 1px solid var(--warning);
+      background: rgba(245, 158, 11, 0.1);
+    }
+
+    .low-label {
+      color: var(--warning);
+      font-size: 0.7rem;
+      font-weight: bold;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        background: var(--surface);
+        padding: 20px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        text-align: center;
+    }
+
+    .stat-val { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+
+    .elig-result{margin-top:12px;font-weight:600}
+    
+    .search-bar {
+        margin-bottom: 15px;
+        width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+  <div class="nav">
+    <div class="brand">🩸 Blood Bank</div>
+    <button class="active" onclick="show('dashboard',this)">Dashboard</button>
+    <button onclick="show('inventory',this)">Inventory</button>
+    <button onclick="show('records',this)">Records</button>
+  </div>
+
+  <div class="main">
+
+    <div id="dashboard">
+      <div class="stats-grid">
+          <div class="stat-card">
+              <div class="muted">Total Donors</div>
+              <div id="statDonors" class="stat-val">0</div>
+          </div>
+          <div class="stat-card">
+              <div class="muted">Total Units (ml)</div>
+              <div id="statVolume" class="stat-val">0</div>
+          </div>
+      </div>
+
+      <h1>Add Donation / Request</h1>
+      <div class="card">
+        <form id="donationForm" class="form">
+          <input id="name" placeholder="Donor/Recipient name" required />
+          <select id="group">
+            <option>O+</option><option>O-</option><option>A+</option><option>A-</option>
+            <option>B+</option><option>B-</option><option>AB+</option><option>AB-</option>
+          </select>
+          <input id="units" type="number" placeholder="ml" value="450" min="1" />
+          <div style="display:flex; gap:5px">
+              <button type="submit" class="submit">Donate</button>
+              <button type="button" class="submit" style="background:var(--muted)" onclick="handleRequest()">Request</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Donor Eligibility Check</h2>
+        <input id="ageInput" type="number" placeholder="Enter age" min="1">
+        <button class="submit" style="margin-top:10px" onclick="checkEligibility()">Check</button>
+        <div id="eligibilityResult" class="elig-result"></div>
+      </div>
+    </div>
+
+    <div id="inventory" style="display:none">
+      <h1>Inventory Management</h1>
+      <input type="text" id="invSearch" class="search-bar" placeholder="Filter by blood group (e.g. A+)..." oninput="render()">
+      <div class="card">
+        <div id="inventoryList" class="inventory"></div>
+      </div>
+    </div>
+
+    <div id="records" style="display:none">
+      <h1>Transaction Records</h1>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Name</th>
+              <th>Group</th>
+              <th>Type</th>
+              <th>Units (ml)</th>
+            </tr>
+          </thead>
+          <tbody id="recordTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const TYPES=["O+","O-","A+","A-","B+","B-","AB+","AB-"];
+const LOW_STOCK_THRESHOLD = 1000; // ml
+
+let data=JSON.parse(localStorage.getItem("blood_data"))||[];
+
+function show(page,btn){
+  ["dashboard","inventory","records"].forEach(p=>{
+    document.getElementById(p).style.display=p===page?"block":"none";
+  });
+  document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  render();
+}
+
+// Logic for Donation (Positive Units)
+document.getElementById("donationForm").onsubmit=e=>{
+  e.preventDefault();
+  addTransaction(
+      document.getElementById("name").value,
+      document.getElementById("group").value,
+      +document.getElementById("units").value,
+      "Donation"
+  );
+  e.target.reset();
+};
+
+// Logic for Request (Negative Units)
+function handleRequest() {
+    const name = document.getElementById("name").value;
+    const group = document.getElementById("group").value;
+    const units = +document.getElementById("units").value;
+
+    if(!name) { alert("Please enter a recipient name"); return; }
+    
+    // Check if enough stock exists
+    const stock = calculateStock();
+    if(stock[group] < units) {
+        alert(`Insufficient stock! Only ${stock[group]}ml of ${group} available.`);
+        return;
+    }
+
+    addTransaction(name, group, -units, "Request");
+    document.getElementById("donationForm").reset();
+}
+
+function addTransaction(name, group, units, type) {
+    data.push({
+        name,
+        group,
+        units,
+        type,
+        date: new Date().toLocaleDateString()
+    });
+    localStorage.setItem("blood_data", JSON.stringify(data));
+    render();
+}
+
+function calculateStock() {
+    const stock={}; TYPES.forEach(t=>stock[t]=0);
+    data.forEach(d=>stock[d.group]+=d.units);
+    return stock;
+}
+
+function render(){
+  const stock = calculateStock();
+  const searchTerm = document.getElementById("invSearch").value.toUpperCase();
+
+  // Update Stats on Dashboard
+  document.getElementById("statDonors").textContent = data.filter(d => d.type === "Donation").length;
+  document.getElementById("statVolume").textContent = Object.values(stock).reduce((a, b) => a + b, 0);
+
+  // Render Inventory with Low Stock Indicators and Search
+  inventoryList.innerHTML = TYPES
+    .filter(t => t.includes(searchTerm))
+    .map(t => {
+        const isLow = stock[t] < LOW_STOCK_THRESHOLD;
+        return `
+            <div class="inv-box ${isLow ? 'low-stock' : ''}">
+                <div style="display:flex; justify-content:space-between; align-items:center">
+                    <span style="font-weight:bold; font-size:1.1rem">${t}</span>
+                    <strong>${stock[t]} ml</strong>
+                </div>
+                ${isLow ? '<span class="low-label">⚠️ LOW STOCK</span>' : ''}
+            </div>
+        `;
+    }).join("");
+
+  // Render Records
+  recordTable.innerHTML=data.slice().reverse().map(d=>
+    `<tr>
+      <td>${d.date}</td>
+      <td>${d.name}</td>
+      <td>${d.group}</td>
+      <td style="color:${d.type === 'Donation' ? 'var(--success)' : 'var(--primary)'}">${d.type}</td>
+      <td>${Math.abs(d.units)}</td>
+    </tr>`
+  ).join("");
+}
+
+function checkEligibility(){
+  const age = +document.getElementById("ageInput").value;
+  const res = document.getElementById("eligibilityResult");
+  if(!age){ res.textContent = "Please enter age"; res.style.color = "var(--muted)"; return; }
+
+  if(age >= 18 && age <= 65){
+    res.textContent = "✅ Eligible to donate";
+    res.style.color = "var(--success)";
+  }else{
+    res.textContent = "❌ Not eligible (Age must be 18–65)";
+    res.style.color = "var(--primary)";
+  }
+}
+
+render();
+</script>
+</body>
+</html>
